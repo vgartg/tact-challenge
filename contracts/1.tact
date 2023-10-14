@@ -1,4 +1,4 @@
-import "@stdlib/deploy";
+import { Contract } from "@stdlib/deploy";
 
 /*
   TASK 1 - Counter 
@@ -7,29 +7,32 @@ import "@stdlib/deploy";
   You also need to implement one getter with the name "counter" to get the current number from the state.
 */
 
-message Add {
-  queryId: Int as uint64;
-  number: Int as uint32;
+interface Add {
+  queryId: number;
+  number: number;
 }
 
-message Subtract {
-  queryId: Int as uint64;
-  number: Int as uint32;
+interface Subtract {
+  queryId: number;
+  number: number;
 }
 
-contract Task1 with Deployable {
-    counter: Int as int32;
+class Task1 extends Contract {
+    counter: number;
 
     init() {
-      self.counter = 0;
+      this.counter = 0;
     }
 
     receive(msg: Add) {
+        this.counter += msg.number;
     }
     
     receive(msg: Subtract) {
+        this.counter -= msg.number;
     }
 
-    get fun counter(): Int {
+    get counter(): number {
+        return this.counter;
     }
 }
