@@ -1,7 +1,4 @@
 import "@stdlib/deploy";
-import { Address, Contract, Deployer } from "@tonclient/core";
-import { Abi, Signer } from "@tonclient/types";
-import { expect } from "chai";
 
 /*
   TASK 2 - Proxy 
