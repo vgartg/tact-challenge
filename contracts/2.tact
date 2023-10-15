@@ -125,6 +125,3 @@ async function example() {
   };
   await task2Contract.handleRefund(refundMessage);
 }
-
-// Вызов примера использования
-example().catch(console.error);
