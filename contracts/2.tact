@@ -13,21 +13,40 @@ import "@stdlib/deploy";
   In refund transaction, it is important to have a check that the refund message came from the admin address
 */
 
-message(0x44) Refund {
-  queryId: Int as uint64;
-  sender: Address;
+message Refund {
+  uint64 queryId;
+  address sender;
 }
 
-contract Task2 with Deployable {
-  admin: Address;
+contract Task2 is Deployable {
+  address admin;
 
-  init(admin: Address) {
-    self.admin = admin;
-  }
-  
-  receive(msg: Refund) {
+  constructor(address _admin) {
+    admin = _admin;
   }
 
-  receive(msg: Slice) {
+  modifier onlyAdmin() {
+    require(msg.sender == admin, "Only admin can call this function");
+    _;
+  }
+
+  function forwardToAdmin(bytes msgBody) private onlyAdmin {
+    (bool success, ) = admin.call{value: msg.value}(msgBody);
+    require(success, "Forwarding to admin failed");
+  }
+
+  function refundToUser(address sender, uint256 amount) private {
+    (bool success, ) = sender.call{value: amount}("");
+    require(success, "Refund to user failed");
+  }
+
+  receive() external payable {
+    // Forward all received TONs to the admin contract
+    forwardToAdmin(msg.data);
+  }
+
+  receive(Refund refundMsg) external onlyAdmin {
+    // Refund TONs back to the user
+    refundToUser(refundMsg.sender, msg.value);
   }
 }
