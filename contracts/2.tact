@@ -13,9 +13,35 @@ import "@stdlib/deploy";
   In refund transaction, it is important to have a check that the refund message came from the admin address
 */
 
+message(0x44) Refund {
+  queryId: Int as uint64;
+  sender: Address;
+}
+
 interface RefundMessage {
   queryId: bigint;
-  sender: Address;
+  sender: address;
+}
+
+contract Task2 with Deployable {
+  admin: Address;
+
+  init(admin: Address) {
+    self.admin = admin;
+  }
+  
+  receive(msg: Refund) {
+    const refundMessage: RefundMessage = {
+      queryId: BigInt(msg.queryId),
+      sender: msg.sender,
+    };
+    
+    // Handle the refund message here
+  }
+  
+  receive(msg: Slice) {
+    // Handle other message types here
+  }
 }
 
 // Контракт для пересылки TON и обработки Refund сообщений
