@@ -1,4 +1,7 @@
 import "@stdlib/deploy";
+import { Address, Contract, Deployer } from "@tonclient/core";
+import { Abi, Signer } from "@tonclient/types";
+import { expect } from "chai";
 
 /*
   TASK 2 - Proxy 
@@ -13,40 +16,115 @@ import "@stdlib/deploy";
   In refund transaction, it is important to have a check that the refund message came from the admin address
 */
 
-message Refund {
-  uint64 queryId;
-  address sender;
+interface RefundMessage {
+  queryId: bigint;
+  sender: Address;
 }
 
-contract Task2 is Deployable {
-  address admin;
+// Контракт для пересылки TON и обработки Refund сообщений
+class Task2Contract {
+  private readonly admin: Address;
+  private readonly contract: Contract;
 
-  constructor(address _admin) {
-    admin = _admin;
+  constructor(deployer: Deployer, admin: Address) {
+    this.admin = admin;
+    this.contract = deployer.wrap({
+      abi: new Abi({
+        type: "Contract",
+        value: [
+          {
+            name: "refund",
+            inputs: [
+              { name: "queryId", type: "uint64" },
+              { name: "sender", type: "address" },
+            ],
+            outputs: [],
+          },
+        ],
+      }),
+      tvc: `
+        <... код TVC контракта ...>
+      `,
+    });
   }
 
-  modifier onlyAdmin() {
-    require(msg.sender == admin, "Only admin can call this function");
-    _;
+  async sendTonsToAdmin(userAddress: Address, originalMessage: string): Promise<void> {
+    // Подготавливаем сообщение с данными
+    const message = {
+      originalMessage,
+      userAddress,
+    };
+
+    // Отправляем сообщение административному контракту
+    await this.contract.sendMessage({
+      address: this.admin,
+      abi: new Abi({
+        type: "Contract",
+        value: [
+          {
+            name: "receive",
+            inputs: [
+              { name: "msg", type: "tuple" },
+            ],
+            outputs: [],
+          },
+        ],
+      }),
+      call_set: {
+        function_name: "receive",
+        input: { msg: message },
+      },
+    });
   }
 
-  function forwardToAdmin(bytes msgBody) private onlyAdmin {
-    (bool success, ) = admin.call{value: msg.value}(msgBody);
-    require(success, "Forwarding to admin failed");
-  }
+  async handleRefund(refundMessage: RefundMessage): Promise<void> {
+    // Проверяем, что сообщение пришло от административного контракта
+    expect(refundMessage.sender).to.equal(this.admin);
 
-  function refundToUser(address sender, uint256 amount) private {
-    (bool success, ) = sender.call{value: amount}("");
-    require(success, "Refund to user failed");
-  }
-
-  receive() external payable {
-    // Forward all received TONs to the admin contract
-    forwardToAdmin(msg.data);
-  }
-
-  receive(Refund refundMsg) external onlyAdmin {
-    // Refund TONs back to the user
-    refundToUser(refundMsg.sender, msg.value);
+    // Возвращаем TON пользователю
+    await this.contract.sendMessage({
+      address: refundMessage.sender,
+      abi: new Abi({
+        type: "Contract",
+        value: [
+          {
+            name: "refund",
+            inputs: [
+              { name: "queryId", type: "uint64" },
+              { name: "sender", type: "address" },
+            ],
+            outputs: [],
+          },
+        ],
+      }),
+      call_set: {
+        function_name: "refund",
+        input: refundMessage,
+      },
+    });
   }
 }
+
+// Пример использования
+async function example() {
+  const deployer = new Deployer();
+  const adminAddress = "your_admin_address_here"; // Адрес административного контракта
+
+  // Инициализация контракта
+  const task2Contract = new Task2Contract(deployer, adminAddress);
+  
+  // Пример отправки TON административному контракту
+  const userAddress = "user_address_here"; // Адрес пользователя
+  const originalMessage = "original_message_here"; // Оригинальное сообщение
+  await task2Contract.sendTonsToAdmin(userAddress, originalMessage);
+
+  // Пример обработки Refund сообщения
+  const refundMessage: RefundMessage = {
+    queryId: BigInt(12345),
+    sender: "sender_address_here", // Адрес пользователя, от которого пришло сообщение
+  };
+  await task2Contract.handleRefund(refundMessage);
+}
+
+// Вызов примера использования
+example().catch(console.error);
